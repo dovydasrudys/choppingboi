@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const fs = require('fs');
 
 const Discord = require('discord.js');
@@ -29,11 +31,9 @@ const reactionOptions = {
 client.once('ready', () => {
     console.log('ready');
     setInterval(() => {
-        console.log('trying to get post');
 
         getLastPost().then((post) => {
             if (post) {
-                console.log('got post');
                 const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
                 const ids = content.split('\n');
                 ids.pop();
@@ -53,8 +53,6 @@ client.once('ready', () => {
                       });
                     });
                 }
-            } else {
-                console.log('no post');
             }
         })
     }, 10 * 1000)
@@ -127,4 +125,4 @@ function getLastPost() {
         });
 }
 
-client.login('NzM2MjUxNDQ1ODY2NzkxMDEy.XxsFlw.Tf_a7PXGCWpi-1Tk4YnKW7hqSc4');
+client.login(process.env.DISCORD_TOKEN);

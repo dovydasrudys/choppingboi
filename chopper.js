@@ -36,7 +36,7 @@ function chop(url) {
             wallpaper.composite(right, targetWidth / 2, 0);
 
             const wallpaperFile = 'wallpaper.png';
-            image.write(wallpaperFile);
+            wallpaper.write(wallpaperFile);
 
             return wallpaperFile;
         })
