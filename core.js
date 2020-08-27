@@ -6,6 +6,8 @@ const Discord = require('discord.js');
 const axios = require('axios').default;
 
 const chop = require('./chopper').chop;
+const getPossibleCutReactions = require('./chopper').getPossibleCutReactions;
+const reactionOptions = require('./reactionOptions').reactionOptions;
 
 //Set up express
 const express = require('express');
@@ -14,19 +16,19 @@ const port = 3000;
 
 app.get('/', (req, res) => res.send('Hello World!'));
 app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
+app.use(express.static('static'))
 //--------------------------------------------------------
+
 
 const client = new Discord.Client({ partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
 
 let SUBREDDIT = 'https://www.reddit.com/r/WidescreenWallpaper';
+
 let lastPost = {
     id: null
 };
 
-const reactionOptions = {
-    thumbsup: '👍',
-    heart: '❤️',
-}
+lastPost.id = fs.readFileSync('last_post.txt', { encoding: 'utf-8', flag: 'r'});
 
 client.once('ready', () => {
     console.log('ready');
@@ -34,25 +36,25 @@ client.once('ready', () => {
 
         getLastPost().then((post) => {
             if (post) {
-                const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
-                const ids = content.split('\n');
-                ids.pop();
-                if(ids.length > 0){
-                    chop(lastPost.url)
-                    .then((wallpaperFile) => {
-                      ids.forEach((id) => {
+                lastPost.id = post.id;
+                fs.writeFile('last_post.txt', post.id, () => {console.log('Last post changed.')});
+
+                getPossibleCutReactions(post.url).then((possibleReactions => {
+                    const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
+                    const ids = content.split('\n');
+                    ids.pop();
+                    ids.forEach((id) => {
                         const channel = client.channels.cache.get(id);
                         if(channel){
-                            channel.send(`[POST] ${lastPost.title} ${lastPost.url}`)
+                            channel.send(`[POST] ${post.title} ${post.url}`)
                             .then(message => {
-                                for (key in reactionOptions) {
-                                    message.react(reactionOptions[key]);
-                                }
+                                possibleReactions.forEach((reaction) => {
+                                    message.react(reaction);
+                                })
                             });
                         }
-                      });
                     });
-                }
+                }));
             }
         })
     }, 10 * 1000)
@@ -73,28 +75,33 @@ client.on('messageReactionAdd', async (reaction, user) => {
     }
     
     if(reaction.message.author.id === client.user.id && reaction.message.content.startsWith('[POST]')){
-        const url = reaction.message.content.split(' ').find(part => part.startsWith('https:'));
-        chop(url)
-        .then((wallpaperFile) =>{
-            switch (reaction.emoji.name) {
-                case reactionOptions.thumbsup:
-                    user.send(`Hey, I chopped up an image you liked 😊`, {files: [wallpaperFile]});
-                    break;
-                case reactionOptions.heart:
-                    reaction.message.channel.send(`This one is so good, everyone should try it 😍`, {files: [wallpaperFile]});
-                default:
-                    console.log('default');
-                    break;
+        //If not one of the possible reaction options then do nothing
+        if(!Object.values(reactionOptions).includes(reaction.emoji.name)){
+            return;
+        }
+
+        //Remove all other user reactions
+        for (const key in reactionOptions) {
+            const option = reactionOptions[key];
+            if(option !== reaction.emoji.name){
+                const reactionObject = reaction.message.reactions.resolve(option);
+                if(reactionObject){
+                    reactionObject.users.remove(user);
+                }
             }
-        })
+        }
+
+        const url = reaction.message.content.split(' ').find(part => part.startsWith('https:'));
+        const name = url.replace('https://i.redd.it/','').split('.')[0];
+
+        const result = chop(url, name, reaction.emoji.name);
+        Promise.resolve(result)
+        .then((path) =>{
+            console.log(path);
+            user.send(`Hey, I chopped up an image you liked 😊 ${process.env.REPL}/${path}`);
+        });
     }
 })
-
-client.on('message', (message) => {
-    if (message.content.toLowerCase().startsWith('!chop reset')) {
-        lastPost.id = null;
-    }
-});
 
 
 client.on('message', (message) => {
