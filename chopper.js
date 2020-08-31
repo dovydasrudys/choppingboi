@@ -17,6 +17,7 @@ function chop(url, name, cutOption) {
             nameEnd = key;
         }
     }
+    console.log(`chopping ${name}${nameEnd}`);
 
     if(fs.existsSync(`static/${name}_${nameEnd}.png`)){
         return `/${name}_${nameEnd}.png`;
@@ -25,8 +26,8 @@ function chop(url, name, cutOption) {
     return Jimp.read(url)
         .then(image => {
             //Resizing
-            const targetAR = calculateAspectRatio(targetWidth + gap, targetHeight);
-            const currentAR = calculateAspectRatio(image.bitmap.width, image.bitmap.height);
+            let targetAR = calculateAspectRatio(targetWidth + gap, targetHeight);
+            let currentAR = calculateAspectRatio(image.bitmap.width, image.bitmap.height);
 
             if (currentAR > targetAR) {
                 image.resize(Jimp.AUTO, targetHeight);
@@ -35,9 +36,11 @@ function chop(url, name, cutOption) {
                 image.resize(targetWidth + gap, Jimp.AUTO);
             }
 
+            console.log(`resized ${name}${nameEnd}`);
+
             //Cutting
-            const centerX = image.bitmap.width / 2;
-            const centerY = image.bitmap.height / 2;
+            let centerX = image.bitmap.width / 2;
+            let centerY = image.bitmap.height / 2;
 
             switch (cutOption) {
                 case reactionOptions.heart:
@@ -59,15 +62,18 @@ function chop(url, name, cutOption) {
                     break;
             }
 
+            console.log(`cropped ${name}${nameEnd}`);
 
-            const left = image.clone().crop(0, 0, targetWidth / 2, targetHeight);
 
-            const right = image.clone().crop(targetWidth / 2 + gap, 0, targetWidth / 2, targetHeight);
+            let left = image.clone().crop(0, 0, targetWidth / 2, targetHeight);
 
-            var wallpaper = new Jimp(targetWidth, targetHeight, '#ffffff');
+            let right = image.clone().crop(targetWidth / 2 + gap, 0, targetWidth / 2, targetHeight);
+
+            let wallpaper = new Jimp(targetWidth, targetHeight, '#ffffff');
             wallpaper.composite(left, 0, 0);
             wallpaper.composite(right, targetWidth / 2, 0);
 
+            console.log(`composed ${name}${nameEnd}`);
             
             wallpaper.write(`static/${name}_${nameEnd}.png`);
 
@@ -81,15 +87,16 @@ function chop(url, name, cutOption) {
 function getPossibleCutReactions(url){
     return Jimp.read(url)
     .then(image => {
-        const targetAR = calculateAspectRatio(targetWidth + gap, targetHeight);
-        const currentAR = calculateAspectRatio(image.bitmap.width, image.bitmap.height);
+        let targetAR = calculateAspectRatio(targetWidth + gap, targetHeight);
+        let currentAR = calculateAspectRatio(image.bitmap.width, image.bitmap.height);
 
         if (currentAR > targetAR) {
             return [reactionOptions['heart'], reactionOptions['left'], reactionOptions['right']];
         }
-        else {
+        else if(currentAR < targetAR) {
             return [reactionOptions['heart'], reactionOptions['up'], reactionOptions['down']];
         }
+        return [reactionOptions['heart']];
     })
 }
 
