@@ -19,23 +19,125 @@ app.listen(port, () => console.log(`Example app listening at http://localhost:${
 app.use(express.static('static'))
 //--------------------------------------------------------
 
+let lastPost = {
+    id: null
+};
+
+lastPost.id = fs.readFileSync('last_post.txt', { encoding: 'utf-8', flag: 'r'});
 
 const client = new Discord.Client({ partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
 
 let SUBREDDIT = 'https://www.reddit.com/r/WidescreenWallpaper';
 
-let lastPost = {
-    id: null
-};
-
 client.once('ready', () => {
     console.log('ready');
-    lastPost.id = fs.readFileSync('last_post.txt', { encoding: 'utf-8', flag: 'r'});
     checkSubreddit();
     setInterval(checkSubreddit, 5 * 60 * 1000);
 });
 
-client.on('messageReactionAdd', async (reaction, user) => {
+client.on('messageReactionAdd', handleMessageReaction);
+
+client.on('message', (message) => {
+    if (message.content.toLowerCase().startsWith('!chop register')) {
+        registerChannel(message);
+    } else if (message.content.toLowerCase() === '!chop filters show'){
+        showFilters();
+    } else if (message.content.toLowerCase().startsWith('!chop filters add')){
+        addFilter(message);
+    } else if (message.content.toLowerCase().startsWith('!chop filters remove')){
+        removeFilter();
+    } else if (message.content.toLowerCase().startsWith('!chop')) {
+        addChopRequest(message);
+    }
+});
+
+function showFilters(message){
+    const filtersContent = fs.readFileSync('filters.txt', { encoding: 'utf8', flag: 'r' }).trim();
+    if (filtersContent === ''){
+        return;
+    }
+    const filters = filtersContent.split('\n');
+    let filtersMessage = '';
+    for (let index = 0; index < filters.length; index++) {
+        filtersMessage += `[${index + 1}] ${filters[index]}\n`;
+    }
+    message.channel.send(filtersMessage);
+}
+
+function addFilter(message){
+    const newFilter = message.content.toLowerCase().replace('!chop filters add ', '');
+    fs.appendFile('filters.txt', `${newFilter}\n`, () => {
+        message.channel.send(`"${newFilter}" added to filters list.`);
+    });
+}
+
+async function removeFilter(message){
+    const filterToDeleteNr = parseInt(message.content.toLowerCase().replace('!chop filters remove ', ''));
+    const filtersContent = fs.readFileSync('filters.txt', { encoding: 'utf8', flag: 'r' }).trim();
+    const updatedFilters = filtersContent.split('\n').filter((value, index) => index !== filterToDeleteNr - 1);
+    await fs.writeFile('filters.txt', '', () => {
+        console.log('filters file cleaned');
+    });
+    for (let index = 0; index < updatedFilters.length; index++) {
+        fs.appendFile('filters.txt', `${updatedFilters[index]}\n`, () => {
+            message.channel.send(`Filter No.${filterToDeleteNr} deleted from filters list.`);
+        });
+    }
+}
+
+function registerChannel(message){
+    const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
+    const ids = content.split('\n');
+    if (!ids.includes(message.channel.id)) {
+        fs.appendFile('channels.txt', `${message.channel.id}\n`, function (err) {
+            if (err) console.log(err);
+            console.log(`${message.channel.id} added to channels list`);
+            message.channel.send('I added this channel to my list 😊');
+        });
+    } else {
+        message.channel.send('This channel was already in my list 😊');
+    }
+}
+
+function addChopRequest(message){
+    const args = message.content.toLowerCase().split(' ');
+
+    let url = '';
+    let title = '';
+
+    if (args.length === 1 && message.attachments.size === 1){   //attached file
+        console.log('file');
+        const attachement = message.attachments.values().next().value;
+        url = attachement.url;
+        title = attachement.name;
+    }else if (args.length === 3){                               //provided url
+        url = args[1];
+        title = args[2].replace(/[^a-zA-Z0-9]/g,'_');
+    } else {
+        console.log(args.length);
+        console.log(message.attachments);
+    }
+
+    console.log(url);
+    console.log(title);
+
+    const embed = new Discord.MessageEmbed()
+        .setTitle(`${message.author.username}'s request 😊`)
+        .setImage(url)
+        .addField('Image title', title)
+        .addField('Original image url', url);
+
+    message.channel.send(embed)
+        .then((message) => {
+            getPossibleCutReactions(url).then((possibleReactions) => {
+                possibleReactions.forEach((option) => {
+                    message.react(option);
+                });
+            });
+        });
+}
+
+async function handleMessageReaction(reaction, user){
     if (reaction.partial) {
 		try {
 			await reaction.fetch();
@@ -99,100 +201,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
                 });
         });
     }
-})
-
-
-client.on('message', (message) => {
-    if (message.content.toLowerCase().startsWith('!chop')) {
-        const args = message.content.toLowerCase().split(' ');
-
-        if (args.length === 2 && args[1] === 'register'){
-            const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
-            const ids = content.split('\n');
-            if (!ids.includes(message.channel.id)) {
-                fs.appendFile('channels.txt', `${message.channel.id}\n`, function (err) {
-                    if (err) console.log(err);
-                    console.log(`${message.channel.id} added to channels list`);
-                    message.channel.send('I added this channel to my list 😊');
-                });
-            } else {
-                message.channel.send('This channel was already in my list 😊');
-            }
-        }
-        message.delete();
-    }
-});
-
-client.on('message', (message) => {
-    if (message.content.toLowerCase().startsWith('!chop')) {
-        const args = message.content.toLowerCase().split(' ');
-
-        if(args[1] === 'filters'){
-            return;
-        }
-
-        if (args.length === 3){
-            const url = args[1];
-            const title = args[2].replace(/[^a-zA-Z0-9]/g,'_');
-
-            const embed = new Discord.MessageEmbed()
-                .setTitle(`${message.author.username}'s request 😊`)
-                .setImage(url)
-                .addField('Image title', title)
-                .addField('Original image url', url);
-
-            message.channel.send(embed)
-                .then((message) => {
-                    getPossibleCutReactions(url).then((possibleReactions) => {
-                        possibleReactions.forEach((option) => {
-                            message.react(option);
-                        });
-                    });
-                });
-        }
-        message.delete();
-    }
-});
-
-client.on('message', (message) => {
-    if (message.content.toLowerCase() === '!chop filters show'){
-        const filtersContent = fs.readFileSync('filters.txt', { encoding: 'utf8', flag: 'r' }).trim();
-        if (filtersContent === ''){
-            return;
-        }
-        const filters = filtersContent.split('\n');
-        let filtersMessage = '';
-        for (let index = 0; index < filters.length; index++) {
-            filtersMessage += `[${index + 1}] ${filters[index]}\n`;
-        }
-        message.channel.send(filtersMessage);
-    }
-});
-
-client.on('message', (message) => {
-    if (message.content.toLowerCase().startsWith('!chop filters add')){
-        const newFilter = message.content.toLowerCase().replace('!chop filters add ', '');
-        fs.appendFile('filters.txt', `${newFilter}\n`, () => {
-            message.channel.send(`"${newFilter}" added to filters list.`);
-        });
-    }
-});
-
-client.on('message', async (message) => {
-    if (message.content.toLowerCase().startsWith('!chop filters remove')){
-        const filterToDeleteNr = parseInt(message.content.toLowerCase().replace('!chop filters remove ', ''));
-        const filtersContent = fs.readFileSync('filters.txt', { encoding: 'utf8', flag: 'r' }).trim();
-        const updatedFilters = filtersContent.split('\n').filter((value, index) => index !== filterToDeleteNr - 1);
-        await fs.writeFile('filters.txt', '', () => {
-            console.log('filters file cleaned');
-        });
-        for (let index = 0; index < updatedFilters.length; index++) {
-            fs.appendFile('filters.txt', `${updatedFilters[index]}\n`, () => {
-                message.channel.send(`Filter No.${filterToDeleteNr} deleted from filters list.`);
-            });
-        }
-    }
-});
+}
 
 async function checkSubreddit(){
     const post = await getLastPost();
@@ -200,10 +209,6 @@ async function checkSubreddit(){
         lastPost.id = post.id;
         fs.writeFile('last_post.txt', post.id, () => {console.log('Last post changed.')});
         const possibleReactions = await getPossibleCutReactions(post.url);
-        // const name = post.url.replace('https://i.redd.it/','').split('.')[0];
-        // await chop(post.url, name, possibleReactions[0]);
-        // await chop(post.url, name, possibleReactions[1]);
-        // await chop(post.url, name, possibleReactions[2]);
         const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
         const ids = content.split('\n');
         ids.pop();
@@ -214,7 +219,8 @@ async function checkSubreddit(){
                     .setTitle(`${post.title}`)
                     .setImage(`${post.url}`)
                     .addField('Image title', `${post.title.replace(/[^a-zA-Z0-9]/g,'_')}`)
-                    .addField('Original image url', post.url);
+                    .addField('Original image url', post.url)
+                    .addField('Reddit post ID', post.id);
 
                 channel.send(embed)
                 .then(message => {

@@ -87,7 +87,7 @@ function chop(url, name, cutOption) {
 function getPossibleCutReactions(url){
     return Jimp.read(url)
     .then(image => {
-        let targetAR = calculateAspectRatio(targetWidth + gap, targetHeight);
+        let targetAR = calculateAspectRatio(targetWidth, targetHeight);
         let currentAR = calculateAspectRatio(image.bitmap.width, image.bitmap.height);
 
         if (currentAR > targetAR) {
