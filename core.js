@@ -182,7 +182,6 @@ async function handleMessageReaction(reaction, user){
 
             const embed = new Discord.MessageEmbed()
                 .setTitle(`Hey, I chopped up an image you liked 😊`)
-                .setURL(`${process.env.REPL}${path}`)
                 .setImage(`${process.env.REPL}${path}`)
                 .addField('Image title', title)
                 .addField('Original image url', url);
@@ -220,7 +219,7 @@ async function checkSubreddit(){
                     .setImage(`${post.url}`)
                     .addField('Image title', `${post.title.replace(/[^a-zA-Z0-9]/g,'_')}`)
                     .addField('Original image url', post.url)
-                    .addField('Reddit post ID', post.id);
+                    .addField('Reddit post', `${SUBREDDIT}/comments/${post.id}`);
 
                 channel.send(embed)
                 .then(message => {
