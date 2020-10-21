@@ -1,21 +1,20 @@
-require('dotenv').config();
+import 'dotenv/config.js';
 
-const fs = require('fs');
+import fs from 'fs';
 
-const Discord = require('discord.js');
-const axios = require('axios').default;
+import Discord from 'discord.js';
+import axios from 'axios';
 
-const chop = require('./chopper').chop;
-const getPossibleCutReactions = require('./chopper').getPossibleCutReactions;
-const reactionOptions = require('./reactionOptions').reactionOptions;
+import {chop, getPossibleCutReactions} from './chopper.js';
+import {reactionOptions} from './reactionOptions.js';
 
 //Set up express
-const express = require('express');
+import express from'express';
 const app = express();
-const port = 3000;
+const port = 80;
 
 app.get('/', (req, res) => res.send('Hello World!'));
-app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
+app.listen(port, () => console.log(`Listening`));
 app.use(express.static('static'))
 //--------------------------------------------------------
 
@@ -113,7 +112,6 @@ function addChopRequest(message){
     let title = '';
 
     if (args.length === 1 && message.attachments.size === 1){   //attached file
-        console.log('file');
         const attachement = message.attachments.values().next().value;
         url = attachement.url;
         title = attachement.name;
@@ -121,14 +119,9 @@ function addChopRequest(message){
         url = args[1];
         title = args[2].replace(/[^a-zA-Z0-9]/g,'_');
     } else {
-        console.log(args.length);
-        console.log(message.attachments);
         message.channel.send('You might want to try !chop and attach a file to the message or !chop https://urlOfAnImageToChop TitleForTheImage');
         return;
     }
-
-    console.log(url);
-    console.log(title);
 
     const embed = new Discord.MessageEmbed()
         .setTitle(`${message.author.username}'s request 😊`)
@@ -191,14 +184,10 @@ async function handleMessageReaction(reaction, user){
         const result = chop(url, title, reaction.emoji.name);
         Promise.resolve(result)
         .then((path) =>{
-            console.log(path);
-
-            console.log(`${process.env.REPL}${path}`);
-
             const embed = new Discord.MessageEmbed()
                 .setTitle(`Hey, I chopped up an image you liked 😊`)
-                .setURL(`${process.env.REPL}${path}`)
-                .setImage(`${process.env.REPL}${path}`)
+                .setURL(`${process.env.HOSTNAME}${path}`)
+                .setImage(`${process.env.HOSTNAME}${path}`)
                 .addField('Image title', title)
                 .addField('Original image url', url);
             if(redditURL){

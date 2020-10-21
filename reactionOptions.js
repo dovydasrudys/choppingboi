@@ -6,4 +6,4 @@ const reactionOptions = {
     right: '➡️'
 }
 
-exports.reactionOptions = reactionOptions;
+export {reactionOptions};

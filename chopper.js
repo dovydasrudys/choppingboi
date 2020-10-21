@@ -1,6 +1,6 @@
-const Jimp = require('jimp');
-const fs = require('fs');
-const reactionOptions = require('./reactionOptions').reactionOptions;
+import Jimp from 'jimp';
+import fs from 'fs';
+import {reactionOptions} from './reactionOptions.js';
 
 var targetWidth = 3840;
 var targetHeight = 1200;
@@ -100,5 +100,4 @@ function getPossibleCutReactions(url){
     })
 }
 
-exports.chop = chop;
-exports.getPossibleCutReactions = getPossibleCutReactions;
+export {chop, getPossibleCutReactions};
