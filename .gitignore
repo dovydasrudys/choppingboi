@@ -107,3 +107,9 @@ dist
 wallpaper.png
 
 .env
+
+channels.txt
+filters.txt
+last_post.txt
+log.txt
+posts.txt
