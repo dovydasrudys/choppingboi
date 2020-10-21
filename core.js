@@ -30,7 +30,8 @@ const client = new Discord.Client({ partials: ['MESSAGE', 'CHANNEL', 'REACTION']
 let SUBREDDIT = 'https://www.reddit.com/r/WidescreenWallpaper';
 
 client.once('ready', () => {
-    console.log('ready');
+    logLine('-------------------Started-------------------');
+    logLine(`Last post is ${lastPost.id}`);
     checkSubreddit();
     setInterval(checkSubreddit, 5 * 60 * 1000);
 });
@@ -41,7 +42,7 @@ client.on('message', (message) => {
     if (message.content.toLowerCase().startsWith('!chop register')) {
         registerChannel(message);
     } else if (message.content.toLowerCase() === '!chop filters show'){
-        showFilters();
+        showFilters(message);
     } else if (message.content.toLowerCase().startsWith('!chop filters add')){
         addFilter(message);
     } else if (message.content.toLowerCase().startsWith('!chop filters remove')){
@@ -50,6 +51,12 @@ client.on('message', (message) => {
         addChopRequest(message);
     }
 });
+
+function logLine(line){
+  let datetime = new Date();
+  datetime.setHours(datetime.getHours() + 3);
+  fs.appendFileSync('log.txt', `${datetime.toLocaleString()}: ${line}\n`);
+}
 
 function showFilters(message){
     const filtersContent = fs.readFileSync('filters.txt', { encoding: 'utf8', flag: 'r' }).trim();
@@ -116,6 +123,8 @@ function addChopRequest(message){
     } else {
         console.log(args.length);
         console.log(message.attachments);
+        message.channel.send('You might want to try !chop and attach a file to the message or !chop https://urlOfAnImageToChop TitleForTheImage');
+        return;
     }
 
     console.log(url);
@@ -157,8 +166,14 @@ async function handleMessageReaction(reaction, user){
             return;
         }
 
+        logLine('Handling message reaction');
+
         const url = reaction.message.embeds[0].fields.find((field) => field.name === 'Original image url').value;
         const title = reaction.message.embeds[0].fields.find((field) => field.name === 'Image title').value;
+        let redditURL = reaction.message.embeds[0].fields.find((field) => field.name === 'Reddit post');
+        if(redditURL){
+          redditURL = redditURL.value;
+        }
 
         //Remove all other user reactions
         if(reaction.message.channel.type !== "dm"){
@@ -182,9 +197,13 @@ async function handleMessageReaction(reaction, user){
 
             const embed = new Discord.MessageEmbed()
                 .setTitle(`Hey, I chopped up an image you liked 😊`)
+                .setURL(`${process.env.REPL}${path}`)
                 .setImage(`${process.env.REPL}${path}`)
                 .addField('Image title', title)
                 .addField('Original image url', url);
+            if(redditURL){
+              embed.addField('Reddit post', redditURL);
+            }
 
             user.send(embed)
                 .then((message) => {
@@ -200,36 +219,52 @@ async function handleMessageReaction(reaction, user){
                 });
         });
     }
+    logLine('Message reaction handled successfully');
 }
 
-async function checkSubreddit(){
-    const post = await getLastPost();
-    if (post) {
-        lastPost.id = post.id;
-        fs.writeFile('last_post.txt', post.id, () => {console.log('Last post changed.')});
-        const possibleReactions = await getPossibleCutReactions(post.url);
-        const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
-        const ids = content.split('\n');
-        ids.pop();
-        ids.forEach((id) => {
-            const channel = client.channels.cache.get(id);
-            if(channel){
-                const embed = new Discord.MessageEmbed()
-                    .setTitle(`${post.title}`)
-                    .setImage(`${post.url}`)
-                    .addField('Image title', `${post.title.replace(/[^a-zA-Z0-9]/g,'_')}`)
-                    .addField('Original image url', post.url)
-                    .addField('Reddit post', `${SUBREDDIT}/comments/${post.id}`);
+function checkSubreddit(){
+    logLine('Checking SUBREDDIT');
+    getLastPost().then(post => {
+        if (post) {
+          logLine(`New post was found (${post.id}). Last post was (${lastPost.id}).`);
+          lastPost = post;
+          fs.writeFileSync('last_post.txt', post.id);
+          getPossibleCutReactions(post.url).then(possibleReactions => {
+            const content = fs.readFileSync('channels.txt', { encoding: 'utf8', flag: 'r' });
+            const ids = content.split('\n');
+            ids.pop();
+            if (ids.length > 0) {
+              const embed = new Discord.MessageEmbed()
+                .setTitle(`${post.title}`)
+                .setImage(`${post.url}`)
+                .addField('Image title', `${post.title.replace(/[^a-zA-Z0-9]/g,'_')}`)
+                .addField('Original image url', post.url)
+                .addField('Reddit post', `${SUBREDDIT}/comments/${post.id}`);
 
-                channel.send(embed)
-                .then(message => {
-                    possibleReactions.forEach((option) => {
-                        message.react(option);
+              let datetime = new Date();
+              datetime.setHours(datetime.getHours() + 3);
+              fs.appendFileSync('posts.txt', `${datetime.toLocaleString()}: ${post.id}\n`);
+
+              ids.forEach((id) => {
+                const channel = client.channels.cache.get(id);
+                if(channel){
+                    channel.send(embed)
+                    .then(message => {
+                        possibleReactions.forEach((option) => {
+                            message.react(option);
+                        });
                     });
-                });
+                }
+              });
             }
-        });
-    }
+          })
+          
+        } else {
+          logLine('There are no new posts.');
+        }
+    }).catch(reason => {
+      logLine(`Catch block: ${reason}`);
+    });
 }
 
 function getLastPost() {
@@ -247,13 +282,20 @@ function getLastPost() {
                             }
                         });
 
-                        lastPost = post;
                         return post;
                     } else {
                         return null;
                     }
+                } else {
+                  return null;
                 }
+            } else {
+              return null;
             }
+        })
+        .catch(reason => {
+          console.log(reason);
+          return null;
         });
 }
 
