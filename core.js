@@ -47,8 +47,8 @@ const insertPost = async (postId) => {
 }
 
 const getLastPostFromDB = async () => {
-    const res = await postgres.query('SELECT max(id) FROM posts;');
-    return res.rows[0].max;
+    const res = await postgres.query('SELECT * FROM posts ORDER BY created_on DESC;');
+    return res.rows[0].id;
 };
 
 postgres.query('CREATE TABLE IF NOT EXISTS logs (message VARCHAR ( 255 ), created_on TIMESTAMP NOT NULL);', (err, res) => {
