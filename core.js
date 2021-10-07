@@ -110,7 +110,7 @@ client.once('ready', () => {
     logLine('-------------------Started-------------------');
     logLine(`Last post is ${lastPost.id}`);
     checkSubreddit();
-    setInterval(checkSubreddit, process.env.MINUTES_BETWEEN_CHECKS * 60 * 1000);
+    setInterval(checkSubreddit, parseInt(process.env.MINUTES_BETWEEN_CHECKS) * 60 * 1000);
 });
 
 client.on('messageReactionAdd', (reaction, user) => {
